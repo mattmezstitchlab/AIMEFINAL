@@ -37,6 +37,15 @@ export function memoryStore(): DocumentStore {
     async getAsset(id) {
       return assets.get(id);
     },
+    async listDocuments() {
+      return [...docs.values()].map((e) => ({ id: e.doc.id, title: e.doc.title, savedAt: e.savedAt })).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    },
+    async readDocument(id) {
+      return docs.get(id) ?? null;
+    },
+    async listQuarantined() {
+      return [];
+    },
     async snapshot(doc, label) {
       const s = { id: uid('v'), docId: doc.id, title: doc.title, label, at: new Date().toISOString(), doc };
       snaps.push(s);

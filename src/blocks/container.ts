@@ -29,9 +29,11 @@ export const containerBlock = defineBlock<ContainerProps>({
   defaults: () => ({ columns: 6, gap: 16, rowHeight: 48, padding: 24, tone: 'surface' }),
 
   render(props, ctx) {
+    const tone = TONES.some(([t]) => t === props.tone) ? props.tone : 'surface';
+    const padding = typeof props.padding === 'number' && Number.isFinite(props.padding) ? Math.min(160, Math.max(0, props.padding)) : 24;
     const section = h('section', {
-      class: `b-container b-container--${props.tone}`,
-      style: { '--pad': `${props.padding}px` },
+      class: `b-container b-container--${tone}`,
+      style: { '--pad': `${padding}px` },
     });
     const grid = ctx.renderChildren();
     if (grid) section.append(grid);

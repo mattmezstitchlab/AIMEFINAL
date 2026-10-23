@@ -9,8 +9,8 @@
  * vient d'AIMENEW (parseDocument). Pas de dépendance : le noyau reste minuscule.
  */
 import { DOCUMENT_FORMAT, DOCUMENT_VERSION, type AimeDocument, type AssetRef, type BlockNode, type NodeId } from './types';
-import { uid } from './ids';
-import { assetIdOf } from './document';
+import { isValidId, uid } from './ids';
+import { assetIdOf, clampPlacement, columnsOf, MAX_DEPTH } from './document';
 
 export type OpenResult =
   | { ok: true; doc: AimeDocument; report: { from: number; warnings: string[] } }
@@ -29,8 +29,8 @@ const migrations: Record<number, (raw: Raw) => Raw> = {
 };
 
 const MAX_NODES = 5000;
-const ID = /^[A-Za-z0-9_-]{1,64}$/;
-const MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'image/svg+xml']);
+/** Le SVG est exclu : ouvert dans un onglet, il peut exécuter du code dans l'origine de l'application. */
+export const ASSET_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']);
 
 export function openDocument(value: unknown): OpenResult {
   try {
@@ -75,18 +75,20 @@ function validate({ raw, from }: { raw: Raw; from: number }): { doc: AimeDocumen
   const nodes = raw.nodes;
   if (typeof root !== 'string' || !nodes || typeof nodes !== 'object' || Array.isArray(nodes)) fail('racine absente.');
   const all = nodes as Record<string, unknown>;
-  if (!all[root]) fail('la racine ne correspond à aucun bloc.');
+  if (!isValidId(root) || !Object.hasOwn(all, root)) fail('la racine ne correspond à aucun bloc.');
   if (Object.keys(all).length > MAX_NODES) fail(`trop de blocs (plus de ${MAX_NODES}).`);
 
   const seen = new Set<NodeId>();
-  const clean: Record<NodeId, BlockNode> = {};
+  // Objets sans prototype : un identifiant comme « __proto__ » ne peut rien détourner.
+  const clean: Record<NodeId, BlockNode> = Object.create(null);
   const visit = (id: NodeId, depth: number) => {
-    if (depth > 64) fail('imbrication trop profonde.');
+    if (depth > MAX_DEPTH) fail('imbrication trop profonde.');
+    if (!isValidId(id)) fail(`identifiant de bloc invalide.`);
     if (seen.has(id)) fail(`le bloc ${id} apparaît deux fois.`);
     seen.add(id);
-    const node = all[id] as Partial<BlockNode> | undefined;
+    const node = (Object.hasOwn(all, id) ? all[id] : undefined) as Partial<BlockNode> | undefined;
     if (!node || typeof node !== 'object') fail(`le bloc ${id} est référencé mais absent.`);
-    if (node.id !== id || !ID.test(id) || typeof node.type !== 'string' || !node.type) fail(`le bloc ${id} est mal formé.`);
+    if (node.id !== id || typeof node.type !== 'string' || !node.type || node.type.length > 64) fail(`le bloc ${id} est mal formé.`);
     if (!node.props || typeof node.props !== 'object' || Array.isArray(node.props)) fail(`le bloc ${id} n’a pas de données.`);
     const p = node.place;
     if (!p || ![p.col, p.row, p.colSpan, p.rowSpan].every((n) => Number.isFinite(n))) fail(`placement du bloc ${id} invalide.`);
@@ -104,15 +106,21 @@ function validate({ raw, from }: { raw: Raw; from: number }): { doc: AimeDocumen
   };
   visit(root, 0);
   if (!clean[root].children) fail('la racine doit être une grille.');
+  // Placements ramenés dans la grille de leur parent (colonnes, étendues, lignes).
+  for (const parent of Object.values(clean)) {
+    if (!parent.children) continue;
+    const columns = columnsOf(parent);
+    for (const childId of parent.children) clean[childId].place = clampPlacement(clean[childId].place, columns);
+  }
 
   const orphans = Object.keys(all).length - seen.size;
   if (orphans > 0) warnings.push(`${orphans} bloc(s) non rattaché(s) à la page ont été ignorés.`);
 
-  const assets: Record<string, AssetRef> = {};
+  const assets: Record<string, AssetRef> = Object.create(null);
   const rawAssets = raw.assets && typeof raw.assets === 'object' && !Array.isArray(raw.assets) ? (raw.assets as Record<string, unknown>) : {};
   for (const [key, value] of Object.entries(rawAssets)) {
     const a = value as Partial<AssetRef>;
-    if (!a || a.id !== key || !ID.test(key) || typeof a.mime !== 'string' || !MIMES.has(a.mime) || typeof a.size !== 'number') {
+    if (!a || a.id !== key || !isValidId(key) || typeof a.mime !== 'string' || !ASSET_MIMES.has(a.mime) || typeof a.size !== 'number') {
       fail(`média ${key} mal décrit.`);
     }
     assets[key] = { id: key, name: typeof a.name === 'string' ? a.name.slice(0, 200) : key, mime: a.mime, size: a.size };
@@ -120,7 +128,7 @@ function validate({ raw, from }: { raw: Raw; from: number }): { doc: AimeDocumen
   for (const node of Object.values(clean)) {
     for (const value of Object.values(node.props)) {
       const id = assetIdOf(value);
-      if (id && !assets[id]) warnings.push(`le bloc ${node.id} montre un média absent (${id}).`);
+      if (id && !Object.hasOwn(assets, id)) warnings.push(`le bloc ${node.id} montre un média absent (${id}).`);
     }
   }
 
@@ -129,12 +137,12 @@ function validate({ raw, from }: { raw: Raw; from: number }): { doc: AimeDocumen
     doc: {
       format: DOCUMENT_FORMAT,
       version: DOCUMENT_VERSION,
-      id: typeof raw.id === 'string' && ID.test(raw.id) ? raw.id : uid('doc'),
+      id: isValidId(raw.id) ? raw.id : uid('doc'),
       title: typeof raw.title === 'string' ? raw.title.slice(0, 200) : 'Sans titre',
       designSystem: typeof raw.designSystem === 'string' && /^[a-z0-9-]{2,40}$/.test(raw.designSystem) ? raw.designSystem : 'iris',
       root,
-      nodes: clean,
-      assets,
+      nodes: { ...clean },
+      assets: { ...assets },
       createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
     },

@@ -1,5 +1,5 @@
 import { ASSET_PREFIX, DOCUMENT_FORMAT, DOCUMENT_VERSION, type AimeDocument, type AssetRef, type BlockNode, type NodeId, type Placement } from './types';
-import { uid } from './ids';
+import { isValidId, uid } from './ids';
 
 /**
  * Opérations pures sur le document.
@@ -11,6 +11,8 @@ export const ROOT_ID = 'root';
 export const ROOT_COLUMNS = 12;
 const MAX_ROW_SPAN = 48;
 const MAX_ROW = 10_000;
+/** Profondeur maximale d'imbrication des grilles (la racine est au niveau 0). Partagée avec la validation. */
+export const MAX_DEPTH = 24;
 
 // ─── Lecture ────────────────────────────────────────────────────────────────
 
@@ -96,10 +98,25 @@ export function createDocument(title = 'Sans titre', now = new Date()): AimeDocu
 
 // ─── Écriture ───────────────────────────────────────────────────────────────
 
+/** Niveau d'imbrication d'un bloc (racine = 0). */
+export function depthOf(doc: AimeDocument, id: NodeId): number {
+  let depth = 0;
+  for (let p = parentOf(doc, id); p; p = parentOf(doc, p)) depth++;
+  return depth;
+}
+
+/** Profondeur du sous-arbre sous un bloc (0 pour une feuille ou une grille vide). */
+function subtreeHeight(doc: AimeDocument, id: NodeId): number {
+  const children = doc.nodes[id]?.children ?? [];
+  return children.length ? 1 + Math.max(...children.map((c) => subtreeHeight(doc, c))) : 0;
+}
+
 export function addBlock(doc: AimeDocument, parentId: NodeId, node: BlockNode): AimeDocument {
   const parent = getNode(doc, parentId);
   if (!isGrid(parent)) throw new Error("Ce bloc ne peut pas contenir d'autres blocs.");
+  if (!isValidId(node.id)) throw new Error(`Identifiant invalide : ${node.id}`);
   if (doc.nodes[node.id]) throw new Error(`Identifiant déjà utilisé : ${node.id}`);
+  if (depthOf(doc, parentId) + 1 > MAX_DEPTH) throw new Error(`Pas plus de ${MAX_DEPTH} grilles imbriquées les unes dans les autres.`);
   const placed: BlockNode = { ...node, place: clampPlacement(node.place, columnsOf(parent)) };
   return touch(doc, {
     ...doc.nodes,
@@ -163,6 +180,7 @@ export function moveBlock(
   }
   const target = getNode(doc, newParentId);
   if (!isGrid(target)) throw new Error("Ce bloc ne peut pas contenir d'autres blocs.");
+  if (depthOf(doc, newParentId) + 1 + subtreeHeight(doc, id) > MAX_DEPTH) throw new Error(`Pas plus de ${MAX_DEPTH} grilles imbriquées les unes dans les autres.`);
 
   const node = getNode(doc, id);
   const oldParentId = parentOf(doc, id);

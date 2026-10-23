@@ -55,12 +55,19 @@ describe('export HTML', () => {
     doc = addAsset(doc, { id: 'img_1', name: 'a.png', mime: 'image/png', size: 3 });
     doc = addBlock(doc, 'root', { id: 't', type: 'text', props: { text: '<script>alert(1)</script>', variant: 'titre' }, place: { col: 1, row: 1, colSpan: 6, rowSpan: 1 } });
     doc = addBlock(doc, 'root', { id: 'i', type: 'image', props: { src: assetRef('img_1'), alt: 'a "b"' }, place: { col: 7, row: 1, colSpan: 6, rowSpan: 4 } });
-    const html = await exportHtml(doc, async () => new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }));
+    const { html, missing } = await exportHtml(doc, async () => new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }));
+    expect(missing).toBe(0);
     expect(html).not.toMatch(/<script/i);
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).toContain('<title>&lt;Titre &amp; co&gt;</title>');
     expect(html).toContain('src="data:image/png;base64,AQID"');
     expect(html).toContain("Content-Security-Policy");
     expect(html).toContain('container-type: inline-size');
+  });
+
+  it('compte les images introuvables au lieu de les taire', async () => {
+    let doc = addAsset(createDocument(), { id: 'img_1', name: 'a.png', mime: 'image/png', size: 3 });
+    doc = addBlock(doc, 'root', { id: 'i', type: 'image', props: { src: assetRef('img_1') }, place: { col: 1, row: 1, colSpan: 6, rowSpan: 4 } });
+    expect((await exportHtml(doc, async () => undefined)).missing).toBe(1);
   });
 });

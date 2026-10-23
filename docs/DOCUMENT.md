@@ -54,7 +54,7 @@ Pas de propriétaire, de droits ni d'URL de publication dans le document : ce so
 - **Un type de bloc inconnu ne casse rien** : il s'affiche comme emplacement réservé et ses données sont conservées.
 - **Les blocs orphelins** (non rattachés à la racine) sont ignorés et signalés.
 - **Une référence à un média absent** est signalée ; le bloc affiche « image introuvable sur cet appareil ».
-- Les identifiants respectent `[A-Za-z0-9_-]{1,64}` ; 5 000 blocs et 64 niveaux d'imbrication au maximum.
+- Les identifiants respectent `[A-Za-z0-9_-]{1,64}` (ceux que l’application crée aussi, même pour un type de bloc exotique) ; 5 000 blocs et 24 grilles imbriquées au maximum, mêmes limites à l’écriture qu’à la lecture ; les placements hors grille sont ramenés dedans ; `__proto__` et noms réservés refusés.
 
 ### Historique des versions
 

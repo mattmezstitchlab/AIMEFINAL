@@ -138,7 +138,7 @@ export function mountChrome(editor: Editor, fileInput: HTMLInputElement): HTMLEl
       item('Importer un projet…', 'Remplace la page actuelle ; une version de secours est gardée.', 'import', () => importInput.click()),
       h('hr'),
       item('Nouvelle page…', 'Repartir d’une grille vide ou du modèle minimal.', 'new-page', () => void newPage()),
-      item('Versions enregistrées…', 'Revenir à une version précédente.', 'versions', () => void showVersions()),
+      item('Pages et versions…', 'Rouvrir une autre page de cet appareil ou revenir à une version.', 'versions', () => void showVersions()),
       h('p', { class: 'aime-popover__note' }, STORAGE_NOTICE),
     );
   });
@@ -182,9 +182,10 @@ export function mountChrome(editor: Editor, fileInput: HTMLInputElement): HTMLEl
   }
 
   async function downloadHtml(): Promise<void> {
-    const html = await exportHtml(editor.doc, (id) => editor.store.getAsset(id));
+    const { html, missing } = await exportHtml(editor.doc, (id) => editor.store.getAsset(id));
     download(`${slugify(editor.doc.title)}.html`, html, 'text/html;charset=utf-8');
-    notify('Page HTML téléchargée. Elle n’est pas en ligne : ouvrez-la ou hébergez-la où vous voulez.');
+    if (missing) notify(`Page HTML téléchargée, mais ${missing} image(s) introuvable(s) sur cet appareil n’y figurent pas. Remplacez-les puis exportez à nouveau.`, 'error');
+    else notify('Page HTML téléchargée. Elle n’est pas en ligne : ouvrez-la ou hébergez-la où vous voulez.');
   }
 
   async function downloadProject(): Promise<void> {
@@ -199,7 +200,7 @@ export function mountChrome(editor: Editor, fileInput: HTMLInputElement): HTMLEl
 
   async function importProject(file: File): Promise<void> {
     if (file.size > 200 * 1024 * 1024) return notify('Fichier trop lourd pour être importé.', 'error');
-    const result = importPackage(await file.text());
+    const result = await importPackage(await file.text());
     if (!result.ok) return notify(result.reason, 'error');
     const ok = await dialog({
       title: 'Importer ce projet ?',
@@ -235,22 +236,37 @@ export function mountChrome(editor: Editor, fileInput: HTMLInputElement): HTMLEl
   }
 
   async function showVersions(): Promise<void> {
-    const list = await editor.store.listSnapshots();
-    if (!list.length) return notify('Aucune version enregistrée pour l’instant. « Enregistrer » en crée une.');
+    const [snaps, pages, quarantined] = await Promise.all([editor.store.listSnapshots(), editor.store.listDocuments(), editor.store.listQuarantined()]);
+    const others = pages.filter((p) => p.id !== editor.doc.id);
+    if (!snaps.length && !others.length && !quarantined.length) return notify('Aucune autre page ni version pour l’instant. « Enregistrer » crée une version.');
     const fmt = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
     const choice = await dialog({
-      title: 'Versions enregistrées',
+      title: 'Pages et versions',
       className: 'aime-dialog--list',
       body: [STORAGE_NOTICE],
       actions: [
-        ...list.slice(0, 12).map((s) => ({ label: `${s.title} — ${s.label} · ${fmt.format(new Date(s.at))}`, value: s.id })),
+        ...others.slice(0, 8).map((p) => ({ label: `Ouvrir la page « ${p.title} » · ${fmt.format(new Date(p.savedAt))}`, value: `doc:${p.id}` })),
+        ...snaps.slice(0, 12).map((s) => ({ label: `Version : ${s.title} — ${s.label} · ${fmt.format(new Date(s.at))}`, value: `snap:${s.id}` })),
+        ...quarantined.map((q) => ({ label: `Télécharger la page illisible mise de côté · ${fmt.format(new Date(q.at))}`, value: `q:${q.id}` })),
         { label: 'Fermer', value: 'close', primary: true },
       ],
     });
     if (!choice || choice === 'close') return;
-    const doc = await editor.store.readSnapshot(choice);
-    if (!doc) return notify('Cette version est illisible.', 'error');
+    if (choice.startsWith('q:')) {
+      const q = quarantined.find((x) => `q:${x.id}` === choice);
+      if (q) download(`page-mise-de-cote-${q.at.slice(0, 10)}.json`, JSON.stringify(q.raw, null, 2), 'application/json');
+      return notify('Page mise de côté téléchargée : elle contient vos données brutes, même si AIME ne peut plus l’ouvrir.');
+    }
     await editor.persistence.flush(editor.doc);
+    if (choice.startsWith('doc:')) {
+      const record = await editor.store.readDocument(choice.slice(4));
+      if (!record) return notify('Cette page est illisible.', 'error');
+      await editor.store.setCurrent(record.doc.id);
+      await editor.replace(record.doc, record.rev);
+      return notify(`Page ouverte : ${record.doc.title}.`);
+    }
+    const doc = await editor.store.readSnapshot(choice.slice(5));
+    if (!doc) return notify('Cette version est illisible.', 'error');
     await editor.store.snapshot(editor.doc, 'Avant restauration');
     await editor.replace(doc, await editor.store.revisionOf(doc.id));
     notify(`Version restaurée : ${doc.title}.`);
@@ -265,7 +281,19 @@ export function mountChrome(editor: Editor, fileInput: HTMLInputElement): HTMLEl
     if (!conflict.hidden) return;
     conflict.replaceChildren(
       h('p', {}, 'Cette page a été enregistrée depuis un autre onglet. Rien n’a été écrasé.'),
-      h('button', { type: 'button', class: 'aime-button', onclick: () => void editor.persistence.keepMine(editor.doc) }, 'Garder ma version'),
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'aime-button',
+          onclick: async () => {
+            // L'autre version n'est jamais perdue : elle devient une version de secours avant d'être remplacée.
+            await editor.store.snapshot(state.theirs.doc, 'Version écartée (conflit)');
+            await editor.persistence.keepMine(editor.doc);
+          },
+        },
+        'Garder ma version',
+      ),
       h(
         'button',
         {

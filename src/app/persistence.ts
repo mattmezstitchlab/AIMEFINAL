@@ -13,6 +13,38 @@ export type SaveState =
   | { kind: 'conflict'; theirs: StoredDocument };
 
 const DELAY_MS = 400;
+const BACKUP_KEY = 'aimefinal.secours';
+
+/**
+ * Copie de secours SYNCHRONE du dernier état : IndexedDB est asynchrone et une fermeture ou un
+ * rechargement juste après une frappe peut l'interrompre. Cette copie, elle, est écrite tout de suite.
+ */
+export function writeBackup(doc: AimeDocument): void {
+  try {
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(doc));
+  } catch {
+    /* stockage plein ou refusé : l'enregistrement normal reste la référence */
+  }
+}
+
+export function readBackup(): unknown {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearBackup(doc?: AimeDocument): void {
+  try {
+    if (!doc) return localStorage.removeItem(BACKUP_KEY);
+    const current = readBackup() as { id?: string; updatedAt?: string } | null;
+    if (current?.id === doc.id && current.updatedAt === doc.updatedAt) localStorage.removeItem(BACKUP_KEY);
+  } catch {
+    /* rien */
+  }
+}
 
 export class Persistence {
   state: SaveState;
@@ -41,6 +73,7 @@ export class Persistence {
   /** Un changement a eu lieu : on enregistrera bientôt (les frappes rapprochées sont regroupées). */
   queue(doc: AimeDocument): void {
     this.latest = doc;
+    writeBackup(doc);
     if (this.state.kind === 'conflict') return; // rien n'est écrit tant que le conflit n'est pas tranché
     this.set({ kind: 'pending' });
     clearTimeout(this.timer);
@@ -60,6 +93,7 @@ export class Persistence {
       const result = await this.store.save(target, this.rev);
       if (result.ok) {
         this.rev = result.rev;
+        clearBackup(target);
         this.set(this.latest ? { kind: 'pending' } : { kind: 'saved', at: result.savedAt });
       } else if ('conflict' in result) {
         this.latest = target;

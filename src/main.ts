@@ -13,6 +13,8 @@ import { startDocument } from './app/templates';
 import { openLocalStore } from './store/local';
 import { memoryStore } from './store/memory';
 import type { DocumentStore } from './store/contract';
+import { openDocument } from './core/migrations';
+import { clearBackup, readBackup } from './app/persistence';
 
 async function boot(): Promise<void> {
   const app = document.getElementById('app')!;
@@ -34,6 +36,22 @@ async function boot(): Promise<void> {
     loaded.warnings.forEach((w) => notify(w));
   } else if (loaded.kind === 'damaged') {
     notify(`La page enregistrée était illisible (${loaded.reason}). Elle a été mise de côté, rien n’a été effacé.`, 'error');
+  }
+
+  // Modifications tapées juste avant une fermeture brutale : la copie de secours est plus récente.
+  const backup = openDocument(readBackup());
+  if (backup.ok && (!doc || (backup.doc.id === doc.id && backup.doc.updatedAt > doc.updatedAt))) {
+    if (doc) await store.snapshot(doc, 'Avant récupération');
+    rev = await store.revisionOf(backup.doc.id);
+    doc = backup.doc;
+    savedAt = null;
+    notify('Vos dernières modifications, non enregistrées à la fermeture, ont été récupérées.');
+  } else if (backup.ok) {
+    // Copie d'une autre page ou déjà enregistrée : on la garde comme version, puis on libère la place.
+    if (backup.doc.id !== doc?.id) await store.snapshot(backup.doc, 'Récupérée après fermeture');
+    clearBackup();
+  } else if (readBackup() !== null) {
+    clearBackup();
   }
 
   if (!doc) {

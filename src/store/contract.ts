@@ -51,6 +51,13 @@ export interface DocumentStore {
   putAsset(id: string, blob: Blob): Promise<void>;
   getAsset(id: string): Promise<Blob | undefined>;
 
+  /** Toutes les pages enregistrées sur cet appareil (la plus récente d'abord). */
+  listDocuments(): Promise<{ id: string; title: string; savedAt: string }[]>;
+  /** Ouvre une page enregistrée, validée et migrée. */
+  readDocument(id: string): Promise<StoredDocument | null>;
+  /** Les enregistrements illisibles mis de côté, avec leur contenu brut pour les récupérer. */
+  listQuarantined(): Promise<{ id: string; at: string; reason: string; raw: unknown }[]>;
+
   snapshot(doc: AimeDocument, label: string): Promise<Snapshot>;
   listSnapshots(): Promise<Snapshot[]>;
   readSnapshot(id: string): Promise<AimeDocument | null>;

@@ -6,7 +6,7 @@ import { getBlock, type Mode, type UpdateOptions } from '../core/registry';
 import { cellAt, readMetrics } from '../core/geometry';
 import { uid } from '../core/ids';
 import type { DocumentStore } from '../store/contract';
-import { acceptImage } from '../store/media';
+import { checkImage } from '../store/media';
 import { Persistence } from './persistence';
 
 export type Tool = 'select' | 'move';
@@ -163,8 +163,18 @@ export class Editor {
     return { doc: next, id };
   }
 
+  /** Une opération du noyau refusée (imbrication trop profonde…) devient un message, jamais une erreur muette. */
+  private attempt<T>(run: () => T): T | null {
+    try {
+      return run();
+    } catch (error) {
+      this.notify(error instanceof Error ? error.message : 'Action impossible.', 'error');
+      return null;
+    }
+  }
+
   addBlock(type: string, props?: Record<string, unknown>): NodeId | null {
-    const result = this.newBlock(this.doc, type, props);
+    const result = this.attempt(() => this.newBlock(this.doc, type, props));
     if (!result) return null;
     this.selected = result.id;
     this.pendingFocus = result.id;
@@ -178,7 +188,7 @@ export class Editor {
    * Ajout du média + bloc = une seule étape d'annulation.
    */
   async addImage(file: File, target?: NodeId): Promise<void> {
-    const check = acceptImage(file);
+    const check = await checkImage(file);
     if (!check.ok) {
       this.notify(check.reason, 'error');
       return;
@@ -196,7 +206,8 @@ export class Editor {
       doc = ops.updateProps(doc, target, { src: ops.assetRef(check.ref.id) });
       this.selected = target;
     } else {
-      const created = this.newBlock(doc, 'image', { src: ops.assetRef(check.ref.id), alt });
+      const base = doc;
+      const created = this.attempt(() => this.newBlock(base, 'image', { src: ops.assetRef(check.ref.id), alt }));
       if (!created) return;
       doc = created.doc;
       this.selected = created.id;
@@ -215,7 +226,8 @@ export class Editor {
   duplicateSelected(): void {
     const id = this.selected;
     if (!id || id === this.doc.root) return;
-    const result = ops.duplicateBlock(this.doc, id);
+    const result = this.attempt(() => ops.duplicateBlock(this.doc, id));
+    if (!result) return;
     this.selected = result.id;
     this.pendingFocus = result.id;
     this.apply(result.doc);
@@ -242,6 +254,7 @@ export class Editor {
   nudge(dx: number, dy: number, resize: boolean): void {
     const id = this.selected;
     if (!id || id === this.doc.root) return;
+    if (this.isCollapsed(id)) return;
     const p = this.doc.nodes[id].place;
     const next: Placement = resize
       ? { ...p, colSpan: p.colSpan + dx, rowSpan: p.rowSpan + dy }
@@ -341,9 +354,23 @@ export class Editor {
     this.select(id && id !== this.doc.root ? id : null);
   };
 
+  /**
+   * Une grille étroite (téléphone, petit conteneur) se replie en une colonne : la position n'y est
+   * pas visible. On n'y déplace donc rien en silence ; on le dit.
+   */
+  private isCollapsed(id: NodeId): boolean {
+    const cell = this.cellOf(id);
+    const grid = cell?.parentElement;
+    if (!cell || !grid) return false;
+    const collapsed = getComputedStyle(cell).gridColumnStart === '1' && getComputedStyle(cell).gridColumnEnd === '-1';
+    if (collapsed) this.notify('Cette grille est repliée en une colonne sur cet écran : élargissez la fenêtre pour placer ce bloc.');
+    return collapsed;
+  }
+
   private startDrag(event: PointerEvent, id: NodeId, kind: 'move' | 'resize', cell: HTMLElement): void {
     const grid = cell.parentElement;
     if (!grid?.classList.contains('aime-grid') || !grid.dataset.grid) return;
+    if (this.isCollapsed(id)) return;
     const parent = this.doc.nodes[grid.dataset.grid];
     const columns = ops.columnsOf(parent);
     const rowHeight = typeof parent.props.rowHeight === 'number' ? parent.props.rowHeight : 56;

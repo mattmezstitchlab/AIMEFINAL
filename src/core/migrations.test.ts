@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { openDocument, parseDocument } from './migrations';
-import { addAsset, addBlock, assetRef, assetsInUse, createDocument, setDesignSystem, setTitle } from './document';
+import { addAsset, addBlock, assetRef, assetsInUse, createDocument, duplicateBlock, MAX_DEPTH, setDesignSystem, setTitle } from './document';
 import { DOCUMENT_VERSION } from './types';
 
 /** Un document tel qu'AIMENEW l'enregistrait (version 1). */
@@ -90,5 +90,40 @@ describe('titre et Design System', () => {
 
   it('un titre vide redevient « Sans titre »', () => {
     expect(setTitle(createDocument('A'), '   ').title).toBe('Sans titre');
+  });
+});
+
+describe('ce qui s’écrit se relit (invariants à l’écriture)', () => {
+  it('dupliquer un bloc au type exotique produit un identifiant valide', () => {
+    const doc = addBlock(createDocument(), 'root', { id: 'x', type: 'carte.v2', props: {}, place: { col: 1, row: 1, colSpan: 4, rowSpan: 1 } });
+    const { doc: next } = duplicateBlock(doc, 'x');
+    expect(openDocument(JSON.parse(JSON.stringify(next))).ok).toBe(true);
+  });
+
+  it('l’imbrication est bornée à l’écriture comme à la lecture', () => {
+    let doc = createDocument();
+    let parent = 'root';
+    for (let i = 0; i < MAX_DEPTH; i++) {
+      const id = `g${i}`;
+      doc = addBlock(doc, parent, { id, type: 'container', props: {}, place: { col: 1, row: 1, colSpan: 1, rowSpan: 1 }, children: [] });
+      parent = id;
+    }
+    expect(() => addBlock(doc, parent, { id: 'trop', type: 'container', props: {}, place: { col: 1, row: 1, colSpan: 1, rowSpan: 1 }, children: [] })).toThrow(/imbriquées/);
+    expect(openDocument(JSON.parse(JSON.stringify(doc))).ok).toBe(true);
+  });
+
+  it('refuse « __proto__ » et les identifiants piégés, à l’écriture et à la lecture', () => {
+    expect(() => addBlock(createDocument(), 'root', { id: '__proto__', type: 'text', props: {}, place: { col: 1, row: 1, colSpan: 1, rowSpan: 1 } })).toThrow();
+    const raw = JSON.parse(JSON.stringify(aimenewV1));
+    raw.nodes.root.children = ['__proto__'];
+    raw.nodes['__proto__'] = { id: '__proto__', type: 'text', props: {}, place: { col: 1, row: 1, colSpan: 1, rowSpan: 1 } };
+    expect(openDocument(JSON.parse(JSON.stringify(raw).replace('"__proto__":{', '"__proto__":{'))).ok).toBe(false);
+  });
+
+  it('ramène les placements absurdes dans la grille', () => {
+    const raw = structuredClone(aimenewV1) as Record<string, any>;
+    raw.nodes.t1.place = { col: -5, row: -2, colSpan: 600, rowSpan: -3 };
+    const r = openDocument(raw);
+    expect(r.ok && r.doc.nodes.t1.place).toEqual({ col: 1, row: 1, colSpan: 12, rowSpan: 1 });
   });
 });

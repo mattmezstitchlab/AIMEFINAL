@@ -21,7 +21,7 @@ export function safeMediaSrc(value: unknown, resolveAsset?: (id: string) => stri
   const id = assetIdOf(value);
   if (id) return resolveAsset?.(id) ?? null;
   const v = value.trim();
-  return /^(https:\/\/|data:image\/(png|jpe?g|gif|webp|avif|svg\+xml)[;,]|blob:)/i.test(v) ? v : null;
+  return /^(https:\/\/|data:image\/(png|jpe?g|gif|webp|avif)[;,]|blob:)/i.test(v) ? v : null;
 }
 
 export function renderDocument(doc: AimeDocument, opts: RenderOptions): HTMLElement {
@@ -80,8 +80,8 @@ function renderGrid(doc: AimeDocument, node: BlockNode, opts: RenderOptions): HT
     'data-grid': node.id,
     style: {
       '--cols': columns,
-      '--gap': `${num(node.props.gap, 16)}px`,
-      '--row-h': `${num(node.props.rowHeight, 56)}px`,
+      '--gap': `${Math.min(120, Math.max(0, num(node.props.gap, 16)))}px`,
+      '--row-h': `${Math.min(400, Math.max(8, num(node.props.rowHeight, 56)))}px`,
     },
   });
 

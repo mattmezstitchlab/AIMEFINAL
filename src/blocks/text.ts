@@ -31,7 +31,13 @@ export const textBlock = defineBlock<TextProps>({
   defaultSize: { colSpan: 6, rowSpan: 1 },
   defaults: () => ({ text: 'Écrivez ici…', variant: 'texte', align: 'start' }),
 
-  render(props, ctx) {
+  render(raw, ctx) {
+    // Valeurs venues d'un fichier : seules les variantes connues passent.
+    const props: TextProps = {
+      text: typeof raw.text === 'string' ? raw.text : '',
+      variant: VARIANTS.some(([v]) => v === raw.variant) ? raw.variant : 'texte',
+      align: ALIGNS.some(([a]) => a === raw.align) ? raw.align : 'start',
+    };
     const el = h(props.variant === 'titre' ? 'h2' : 'p', {
       class: `b-text b-text--${props.variant}`,
       style: { 'text-align': props.align },

@@ -23,6 +23,7 @@ Pour chaque capacité entrée dans AIME FINAL : d'où elle vient, ce qui a été
 - **Source** : AIME-NEXT `src/stockage/depot.ts` (IndexedDB, médias en Blob) et `src/stockage/archive.ts` (archive avec médias).
 - **Réutilisé** : IndexedDB via `idb`, médias en Blob, archive JSON avec médias en base64.
 - **Adapté** : contrat `DocumentStore` (`src/store/contract.ts`) pour brancher un stockage distant plus tard ; **révisions** pour refuser l'écrasement silencieux (autre onglet) ; **quarantaine** d'un enregistrement illisible ; **versions de secours** avant tout remplacement ; stockage en mémoire de secours si IndexedDB est refusé.
+- **Ajouté après relecture indépendante** : copie de secours synchrone (une frappe suivie d'un rechargement n'est plus perdue) ; « Garder ma version » archive d'abord l'autre version ; pages mises de côté téléchargeables depuis « Pages et versions » ; médias vérifiés sur leurs octets réels (SVG et fichiers déguisés refusés).
 - **Équivalence** : `src/store/store.test.ts` (rechargement, conflit, quarantaine, aller-retour d'archive à l'identique) ; parcours navigateur étapes 10–11 et test « aucun écrasement silencieux ».
 - **Limites** : un seul document courant visible ; les médias ne sont jamais supprimés (pas de ramasse-miettes en Phase 1) ; rien n'est synchronisé entre appareils.
 

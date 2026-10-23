@@ -101,6 +101,7 @@ test('Phase 1 — créer, éditer, enregistrer, retrouver, prévisualiser et exp
     await drag(page, image.locator('[data-handle="move"]'), colWidth * 6, -((await image.boundingBox())!.y - (await cell(page, 'text').boundingBox())!.y));
     const moved = await placeOf(image);
     expect(moved.c).toBe(before.c + 6);
+    await expect.poll(async () => (await placeOf(image)).c).toBe(before.c + 6);
     expect(moved.r).toBeLessThan(before.r);
 
     // Titre : plus étroit (glisser le coin).
@@ -114,7 +115,7 @@ test('Phase 1 — créer, éditer, enregistrer, retrouver, prévisualiser et exp
     // Clavier : Maj + flèche agrandit d'une rangée, flèche déplace.
     await title.focus();
     await page.keyboard.press('Shift+ArrowDown');
-    expect((await placeOf(title)).rs).toBe(t1.rs + 1);
+    await expect.poll(async () => (await placeOf(title)).rs).toBe(t1.rs + 1);
 
     // L'outil « Déplacer » : on attrape le bloc entier.
     await page.getByRole('button', { name: 'Déplacer', exact: true }).click();
@@ -267,6 +268,9 @@ test('Téléphone : la barre reste utilisable et la page ne déborde pas', async
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByTestId('add-text').tap();
   await expect(page.locator('.aime-stage .aime-cell[data-type="text"]')).toHaveCount(4);
+  // Bloc choisi, poignées visibles : toujours aucun débordement horizontal.
+  await expect(page.locator('.aime-cell.is-selected [data-handle="move"]')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath('telephone.png') });
   await ctx.close();
 });
@@ -327,5 +331,42 @@ test('Import validé : un fichier abîmé est refusé, un projet exporté se ré
   // Les versions de secours existent.
   await page.getByTestId('export').click();
   await page.getByTestId('versions').click();
-  await expect(page.getByRole('dialog', { name: 'Versions enregistrées' })).toContainText('Avant import');
+  await expect(page.getByRole('dialog', { name: 'Pages et versions' })).toContainText('Avant import');
+});
+
+test('Rien n’est perdu si l’on recharge juste après avoir tapé', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Grille vide' }).click();
+  await page.getByTestId('add-text').click();
+  const editable = page.locator('.aime-stage .aime-cell[data-type="text"] [contenteditable]');
+  await editable.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('texte important');
+  await page.reload(); // sans attendre l'enregistrement automatique
+  await expect(page.locator('.aime-stage .aime-cell[data-type="text"]')).toHaveText('texte important');
+});
+
+test('Une image déguisée (SVG ou fichier abîmé) est refusée', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Grille vide' }).click();
+  await page.getByTestId('image-input').setInputFiles({ name: 'faux.png', mimeType: 'image/png', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>') });
+  await expect(page.getByRole('status').filter({ hasText: 'n’est pas une image' })).toBeVisible();
+  await expect(page.locator('.aime-stage .aime-cell[data-type="image"]')).toHaveCount(0);
+});
+
+test('Garder ma version après un conflit garde aussi l’autre en version de secours', async ({ context }) => {
+  const a = await context.newPage();
+  await a.goto('/');
+  await a.getByRole('button', { name: 'Grille vide' }).click();
+  await expect(a.getByTestId('save-status')).toHaveText(/Enregistré/);
+  const b = await context.newPage();
+  await b.goto('/');
+  await b.getByTestId('add-text').click();
+  await expect(b.getByTestId('save-status')).toHaveText(/Enregistré/);
+  await a.getByTestId('add-grid').click();
+  await a.getByRole('button', { name: 'Garder ma version' }).click();
+  await expect(a.getByTestId('save-status')).toHaveText(/Enregistré/);
+  await a.getByTestId('export').click();
+  await a.getByTestId('versions').click();
+  await expect(a.getByRole('dialog', { name: 'Pages et versions' })).toContainText('Version écartée (conflit)');
 });

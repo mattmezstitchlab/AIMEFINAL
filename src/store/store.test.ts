@@ -3,13 +3,14 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { openLocalStore } from './local';
 import { exportPackage, importPackage } from './package';
-import { acceptImage } from './media';
+import { checkImage, sniffImage } from './media';
 import { addAsset, addBlock, assetRef, createDocument, updateProps } from '../core/document';
 import { devicePolicy } from '../access/contract';
 
 let n = 0;
 const freshStore = () => openLocalStore(`test-${++n}`);
-const png = () => new Blob([new Uint8Array([137, 80, 78, 71, 1, 2, 3])], { type: 'image/png' });
+const PNG_BYTES = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3];
+const png = () => new Blob([new Uint8Array(PNG_BYTES)], { type: 'image/png' });
 
 describe('stockage local (IndexedDB)', () => {
   it('est vide au premier lancement, puis retrouve le document après « rechargement »', async () => {
@@ -54,7 +55,7 @@ describe('stockage local (IndexedDB)', () => {
   it('garde les médias en fichiers et des versions de secours', async () => {
     const store = await freshStore();
     await store.putAsset('img_a', png());
-    expect((await store.getAsset('img_a'))?.size).toBe(7);
+    expect((await store.getAsset('img_a'))?.size).toBe(PNG_BYTES.length);
     const doc = createDocument('Avant');
     const snap = await store.snapshot(doc, 'Avant import');
     expect((await store.listSnapshots())[0]).toMatchObject({ id: snap.id, label: 'Avant import', title: 'Avant' });
@@ -68,7 +69,7 @@ describe('fichier projet portable', () => {
     doc = addAsset(doc, { id: 'img_a', name: 'a.png', mime: 'image/png', size: 7 });
     doc = addBlock(doc, 'root', { id: 'i', type: 'image', props: { src: assetRef('img_a'), alt: 'a' }, place: { col: 1, row: 1, colSpan: 4, rowSpan: 4 } });
     const text = await exportPackage(doc, async () => png());
-    const back = importPackage(text);
+    const back = await importPackage(text);
     expect(back.ok).toBe(true);
     if (!back.ok) return;
     expect(back.doc).toEqual(doc);
@@ -82,19 +83,33 @@ describe('fichier projet portable', () => {
     await expect(exportPackage(doc, async () => undefined)).rejects.toThrow(/introuvable/);
   });
 
-  it('accepte un document seul et refuse un fichier illisible', () => {
+  it('accepte un document seul et refuse un fichier illisible', async () => {
     const doc = createDocument();
-    expect(importPackage(JSON.stringify(doc)).ok).toBe(true);
-    expect(importPackage('{pas du json').ok).toBe(false);
-    expect(importPackage(JSON.stringify({ format: 'aime/package', version: 9 })).ok).toBe(false);
+    expect((await importPackage(JSON.stringify(doc))).ok).toBe(true);
+    expect((await importPackage('{pas du json')).ok).toBe(false);
+    expect((await importPackage(JSON.stringify({ format: 'aime/package', version: 9 }))).ok).toBe(false);
+  });
+
+  it('refuse un média dont les octets ne sont pas l’image annoncée (SVG déguisé)', async () => {
+    let doc = createDocument();
+    doc = addAsset(doc, { id: 'img_a', name: 'a.png', mime: 'image/png', size: 40 });
+    doc = addBlock(doc, 'root', { id: 'i', type: 'image', props: { src: assetRef('img_a') }, place: { col: 1, row: 1, colSpan: 4, rowSpan: 4 } });
+    const svg = btoa('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    const pkg = { format: 'aime/package', version: 1, document: doc, assets: { img_a: { mime: 'image/png', base64: svg } } };
+    expect((await importPackage(JSON.stringify(pkg))).ok).toBe(false);
+    const asSvg = { ...pkg, document: { ...doc, assets: { img_a: { ...doc.assets.img_a, mime: 'image/svg+xml' } } } };
+    expect((await importPackage(JSON.stringify(asSvg))).ok).toBe(false);
   });
 });
 
 describe('médias et accès', () => {
-  it('n’accepte que des images raisonnables', () => {
-    expect(acceptImage({ name: 'a.png', type: 'image/png', size: 100 }).ok).toBe(true);
-    expect(acceptImage({ name: 'a.svg', type: 'image/svg+xml', size: 100 }).ok).toBe(false);
-    expect(acceptImage({ name: 'a.png', type: 'image/png', size: 99e6 }).ok).toBe(false);
+  it('juge une image sur ses octets, pas sur son extension', async () => {
+    const ok = await checkImage(Object.assign(png(), { name: 'a.png' }));
+    expect(ok.ok && ok.ref.mime).toBe('image/png');
+    expect((await checkImage(Object.assign(new Blob(['<svg/>'], { type: 'image/png' }), { name: 'faux.png' }))).ok).toBe(false);
+    expect((await checkImage(new Blob([]))).ok).toBe(false);
+    expect(sniffImage(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe('image/jpeg');
+    expect(sniffImage(new TextEncoder().encode('GIF89a...'))).toBe('image/gif');
   });
 
   it('Phase 1 : l’appareil lit et édite, la publication en ligne est refusée honnêtement', async () => {

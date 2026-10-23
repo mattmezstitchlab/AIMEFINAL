@@ -9,6 +9,8 @@ body {
 body {
   font-family: var(--font-text);
   -webkit-tap-highlight-color: transparent;
+  /* Les poignées d'un bloc collé au bord ne doivent jamais élargir la page. */
+  overflow-x: clip;
 }
 
 body.is-dragging {

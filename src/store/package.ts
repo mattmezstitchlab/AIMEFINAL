@@ -8,6 +8,7 @@
 import type { AimeDocument } from '../core/types';
 import { openDocument } from '../core/migrations';
 import { assetsInUse } from '../core/document';
+import { sniffImage } from './media';
 
 export const PACKAGE_FORMAT = 'aime/package';
 const MAX_ASSET_BYTES = 25 * 1024 * 1024;
@@ -35,7 +36,7 @@ export async function exportPackage(doc: AimeDocument, getAsset: (id: string) =>
   return JSON.stringify(file, null, 2);
 }
 
-export function importPackage(text: string): ImportResult {
+export async function importPackage(text: string): Promise<ImportResult> {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -57,11 +58,17 @@ export function importPackage(text: string): ImportResult {
       if (!file) continue;
       if (file.mime !== ref.mime || typeof file.base64 !== 'string') return { ok: false, reason: `Fichier projet invalide : média ${ref.name} mal décrit.` };
       if (file.base64.length > (MAX_ASSET_BYTES * 4) / 3 + 4) return { ok: false, reason: `Média trop lourd : ${ref.name}.` };
+      let blob: Blob;
       try {
-        blobs.set(id, fromBase64(file.base64, file.mime));
+        blob = fromBase64(file.base64, file.mime);
       } catch {
         return { ok: false, reason: `Fichier projet invalide : média ${ref.name} illisible.` };
       }
+      // Les octets doivent correspondre au type annoncé : un SVG ou un script déguisé est refusé.
+      if (sniffImage(new Uint8Array(await blob.slice(0, 32).arrayBuffer())) !== ref.mime) {
+        return { ok: false, reason: `Fichier projet invalide : ${ref.name} n’est pas l’image annoncée.` };
+      }
+      blobs.set(id, blob);
     }
   }
   for (const id of assetsInUse(opened.doc)) {

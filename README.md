@@ -17,7 +17,7 @@ Une grande surface de création au centre, une barre d'outils flottante en bas.
 | Annuler · Rétablir | Illimités (Ctrl/⌘ + Z, Ctrl/⌘ + Maj + Z) |
 | Aperçu | Ordinateur ou téléphone |
 | Enregistrer | Enregistre sur l'appareil et crée une version de secours (Ctrl/⌘ + S) |
-| Exporter | Page HTML autonome, projet `.aime.json`, import, nouvelle page, versions |
+| Exporter | Page HTML autonome, projet `.aime.json`, import, nouvelle page, pages et versions |
 
 Quand un bloc est choisi, un **second niveau** apparaît au-dessus de la barre : ses réglages (variante de texte, alignement, image, description, colonnes…), dupliquer, supprimer. Au clavier : Tab pour atteindre un bloc, flèches pour le déplacer, Maj + flèches pour le redimensionner, Entrée pour écrire, Échap pour sortir.
 

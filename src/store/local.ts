@@ -89,6 +89,24 @@ export async function openLocalStore(name = DB_NAME): Promise<DocumentStore & { 
       return (await db.get('assets', id))?.blob;
     },
 
+    async listDocuments() {
+      const all = await db.getAll('documents');
+      return all
+        .map((e) => ({ id: e.id, title: typeof (e.doc as { title?: unknown })?.title === 'string' ? (e.doc as { title: string }).title : e.id, savedAt: e.savedAt }))
+        .sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    },
+
+    async readDocument(id) {
+      const entry = await db.get('documents', id);
+      if (!entry) return null;
+      const opened = openDocument(entry.doc);
+      return opened.ok ? { doc: opened.doc, rev: entry.rev, savedAt: entry.savedAt } : null;
+    },
+
+    async listQuarantined() {
+      return (await db.getAll('quarantine')).sort((a, b) => b.at.localeCompare(a.at));
+    },
+
     async snapshot(doc, label) {
       const snap = { id: uid('v'), docId: doc.id, title: doc.title, label, at: new Date().toISOString(), doc };
       await db.put('snapshots', snap);

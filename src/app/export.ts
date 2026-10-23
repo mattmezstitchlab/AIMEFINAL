@@ -11,15 +11,17 @@ import blocksCss from '../styles/blocks.css?inline';
  * images intégrées. La mise en page s'adapte à l'écran (container queries).
  * Repris d'AIMENEW (app/export.ts) ; ajout des médias stockés et d'une politique de sécurité stricte.
  */
-export async function exportHtml(doc: AimeDocument, getAsset: (id: string) => Promise<Blob | undefined>): Promise<string> {
+export async function exportHtml(doc: AimeDocument, getAsset: (id: string) => Promise<Blob | undefined>): Promise<{ html: string; missing: number }> {
   const dataUrls = new Map<string, string>();
+  let missing = 0;
   for (const id of assetsInUse(doc)) {
     const ref = doc.assets[id];
     const blob = ref ? await getAsset(id) : undefined;
     if (ref && blob) dataUrls.set(id, await toDataUrl(blob, ref.mime));
+    else missing++;
   }
   const surface = renderDocument(doc, { mode: 'view', resolveAsset: (id) => dataUrls.get(id) });
-  return `<!doctype html>
+  const html = `<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -41,6 +43,7 @@ ${surface.outerHTML}
 </body>
 </html>
 `;
+  return { html, missing };
 }
 
 export function download(filename: string, content: string, type: string): void {
