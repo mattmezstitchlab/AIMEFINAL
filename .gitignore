@@ -1,0 +1,9 @@
+node_modules
+dist
+test-results
+playwright-report
+*.local
+.env
+.env.*
+.vercel
+.DS_Store
