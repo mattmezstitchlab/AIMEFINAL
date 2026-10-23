@@ -23,4 +23,4 @@ Projet de Matt. Interface, code commenté et documentation en **français**.
 npm run verify && npm run e2e
 ```
 
-Une branche par phase, une PR vers `main`, aucune fusion ni mise en production sans l'accord explicite de Matt.
+**Travail direct en production (décision de Matt, 23/10/2026).** On avance par petits pas : chaque changement validé localement (`verify` + `e2e` verts) est poussé directement sur `main`, que Vercel déploie en production automatiquement. Pas de branche ni de PR par défaut. Une branche + PR reste de mise pour un changement risqué (format du document, stockage, suppression) ou si Matt le demande. Si la CI casse sur `main`, la réparer immédiatement ou annuler le commit (`git revert`).

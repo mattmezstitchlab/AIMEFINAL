@@ -6,7 +6,7 @@ Deux opérations différentes, à ne jamais confondre :
 | --- | --- | --- |
 | Quoi | L'application de création elle-même | Le site créé par un utilisateur |
 | Où | Vercel, depuis ce dépôt | Une URL publique stable, par réalisation |
-| Phase 1 | Aperçu par PR, production après votre accord | **Téléchargement** d'une page HTML autonome — présenté comme tel, jamais comme une mise en ligne |
+| Phase 1 | Production à chaque push sur `main` | **Téléchargement** d'une page HTML autonome — présenté comme tel, jamais comme une mise en ligne |
 
 ## Phase 1 : télécharger une page HTML autonome
 
@@ -34,5 +34,6 @@ Ce qui est volontairement exclu de ce premier chemin : noms de domaine personnal
 ## Déployer AIME FINAL (l'application)
 
 - Configuration : [`vercel.json`](../vercel.json) — `npm ci`, `npm run build`, sortie `dist/`, en-têtes de sécurité.
-- Chaque PR vers `main` reçoit un **aperçu Vercel** si le dépôt est relié à un projet Vercel. Le déploiement de production n'a lieu qu'après fusion, **avec votre accord explicite**.
+- **Chaque push sur `main` part en production** (décision du 23/10/2026 : on avance par petits pas, en confiance). Une PR éventuelle reçoit en plus son propre aperçu.
+- Retour arrière : « Instant Rollback » dans Vercel, ou `git revert` du commit.
 - Avant toute mise en production : `npm run verify` + `npm run e2e` doivent être verts (c'est ce que fait la CI).
