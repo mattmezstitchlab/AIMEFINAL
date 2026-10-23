@@ -58,6 +58,7 @@ Quatre couches séparées, non négociables : **le document** (seule source de v
 ## Documents
 
 - [docs/AUDIT.md](docs/AUDIT.md) — audit des dépôts, choix du noyau, matrice des capacités
+- [docs/AUDIT-AIME-STUDIO.md](docs/AUDIT-AIME-STUDIO.md) — ce qu'AIME STUDIO apporte et comment le refondre ici
 - [docs/DOCUMENT.md](docs/DOCUMENT.md) — le contrat de document universel
 - [docs/CAPACITES.md](docs/CAPACITES.md) — les phases suivantes et leurs sources
 - [docs/PROVENANCE.md](docs/PROVENANCE.md) — ce qui a été repris, adapté, écarté
