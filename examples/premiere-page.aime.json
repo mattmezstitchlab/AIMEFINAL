@@ -1,0 +1,63 @@
+{
+  "format": "aime/document",
+  "version": 2,
+  "id": "doc_exemple01",
+  "title": "Première page",
+  "designSystem": "iris",
+  "root": "root",
+  "nodes": {
+    "root": {
+      "id": "root",
+      "type": "container",
+      "props": { "columns": 12, "gap": 20, "rowHeight": 56, "padding": 40, "tone": "none" },
+      "place": { "col": 1, "row": 1, "colSpan": 12, "rowSpan": 1 },
+      "children": ["kicker", "titre", "texte", "trio"]
+    },
+    "kicker": {
+      "id": "kicker",
+      "type": "text",
+      "props": { "text": "AIME FINAL — exemple", "variant": "legende", "align": "start" },
+      "place": { "col": 1, "row": 1, "colSpan": 6, "rowSpan": 1 }
+    },
+    "titre": {
+      "id": "titre",
+      "type": "text",
+      "props": { "text": "Une grille. Des blocs. Une source de vérité.", "variant": "titre", "align": "start" },
+      "place": { "col": 1, "row": 2, "colSpan": 8, "rowSpan": 3 }
+    },
+    "texte": {
+      "id": "texte",
+      "type": "text",
+      "props": { "text": "Ce fichier montre le contrat de document : des blocs à plat, des grilles qui listent leurs enfants, un Design System à part.", "variant": "texte", "align": "start" },
+      "place": { "col": 1, "row": 5, "colSpan": 7, "rowSpan": 2 }
+    },
+    "trio": {
+      "id": "trio",
+      "type": "container",
+      "props": { "columns": 3, "gap": 16, "rowHeight": 48, "padding": 24, "tone": "surface" },
+      "place": { "col": 1, "row": 8, "colSpan": 12, "rowSpan": 2 },
+      "children": ["un", "deux", "trois"]
+    },
+    "un": {
+      "id": "un",
+      "type": "text",
+      "props": { "text": "01 — Le document", "variant": "legende", "align": "start" },
+      "place": { "col": 1, "row": 1, "colSpan": 1, "rowSpan": 1 }
+    },
+    "deux": {
+      "id": "deux",
+      "type": "text",
+      "props": { "text": "02 — La grille", "variant": "legende", "align": "start" },
+      "place": { "col": 2, "row": 1, "colSpan": 1, "rowSpan": 1 }
+    },
+    "trois": {
+      "id": "trois",
+      "type": "text",
+      "props": { "text": "03 — Les blocs", "variant": "legende", "align": "start" },
+      "place": { "col": 3, "row": 1, "colSpan": 1, "rowSpan": 1 }
+    }
+  },
+  "assets": {},
+  "createdAt": "2026-10-23T14:00:00.000Z",
+  "updatedAt": "2026-10-23T14:00:00.000Z"
+}
