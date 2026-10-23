@@ -1,0 +1,754 @@
+/* Interface du Canevas Zéro — jamais publiée avec la page exportée. */
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-text);
+  -webkit-tap-highlight-color: transparent;
+  /* Les poignées d'un bloc collé au bord ne doivent jamais élargir la page. */
+  overflow-x: clip;
+}
+
+body.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.aime-boot {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+:where(button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ─── La surface ────────────────────────────────────────────────────────── */
+
+.aime-stage {
+  min-height: 100dvh;
+  padding: 76px 0 calc(150px + env(safe-area-inset-bottom));
+}
+
+.aime-frame {
+  min-height: calc(100dvh - 226px);
+}
+
+body.is-previewing .aime-stage {
+  padding-top: 24px;
+}
+
+.aime-stage[data-device='phone'] {
+  background: color-mix(in srgb, var(--ink) 6%, var(--bg));
+}
+
+.aime-stage[data-device='phone'] .aime-frame {
+  width: min(390px, calc(100vw - 32px));
+  min-height: 0;
+  height: min(780px, calc(100dvh - 150px));
+  margin: 0 auto;
+  overflow: auto;
+  border-radius: 36px;
+  border: 10px solid color-mix(in srgb, var(--ink) 88%, var(--bg));
+  box-shadow: var(--shadow);
+  overscroll-behavior: contain;
+}
+
+/* ─── En-tête : orbe, titre, état d'enregistrement ─────────────────────── */
+
+.aime-header {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 6px 14px 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+body.is-previewing .aime-header {
+  display: none;
+}
+
+.aime-orb {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--iris);
+  box-shadow: 0 0 16px -2px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.aime-orb--large {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 8px;
+  animation: aime-breathe 5s ease-in-out infinite;
+}
+
+@keyframes aime-breathe {
+  50% {
+    transform: scale(1.06);
+    filter: hue-rotate(25deg);
+  }
+}
+
+.aime-brand {
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  font-size: 11px;
+}
+
+.aime-title {
+  min-width: 80px;
+  width: 22ch;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.aime-title:hover,
+.aime-title:focus {
+  border-color: var(--line);
+  outline: none;
+}
+
+.aime-status {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.aime-status[data-state='error'],
+.aime-status[data-state='conflict'] {
+  color: var(--danger);
+}
+
+/* ─── Barre d'outils flottante ─────────────────────────────────────────── */
+
+.aime-dock-wrap {
+  position: fixed;
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 70;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  translate: -50% 0;
+}
+
+.aime-dock {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.aime-dock[hidden],
+.aime-context[hidden],
+.aime-banner[hidden] {
+  display: none;
+}
+
+.aime-dock__group {
+  display: flex;
+  gap: 2px;
+}
+
+.aime-dock__group + .aime-dock__group {
+  padding-left: 6px;
+  margin-left: 2px;
+  border-left: 1px solid var(--line);
+}
+
+.aime-dock__note {
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.aime-tool {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 52px;
+  min-height: 48px;
+  padding: 6px 6px 5px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 10.5px/1 var(--font-text);
+  cursor: pointer;
+}
+
+.aime-tool:hover:not(:disabled):not([aria-pressed='true']):not([aria-expanded='true']) {
+  background: var(--surface-2);
+}
+
+.aime-tool[aria-pressed='true'],
+.aime-tool[aria-expanded='true'] {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.aime-tool:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.aime-tool__label {
+  white-space: nowrap;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.aime-tool.has-changes::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  right: 12px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--iris);
+}
+
+/* ─── Second niveau : actions du bloc choisi ───────────────────────────── */
+
+.aime-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  max-width: min(100%, 720px);
+  padding: 5px;
+  border-radius: 16px;
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: var(--shadow);
+  font: 500 12.5px/1 var(--font-text);
+}
+
+.aime-context__label {
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.aime-context button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.aime-context button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.aime-context button:hover,
+.aime-context button[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--bg) 18%, transparent);
+}
+
+.aime-context button.is-danger:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.aime-context :focus-visible {
+  outline-color: var(--bg);
+}
+
+.aime-context__sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: color-mix(in srgb, var(--bg) 25%, transparent);
+}
+
+.aime-context__static {
+  padding: 0 4px;
+  opacity: 0.8;
+}
+
+.aime-context__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 8px;
+}
+
+.aime-context__field input {
+  width: 170px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 16%, transparent);
+  color: inherit;
+  font: inherit;
+}
+
+.aime-context__field input::placeholder {
+  color: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+
+/* ─── Panneaux ─────────────────────────────────────────────────────────── */
+
+.aime-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  display: grid;
+  gap: 2px;
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(70dvh, 520px);
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.aime-popover hr {
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.aime-popover__title {
+  margin: 4px 8px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.aime-popover__note {
+  margin: 6px 8px 2px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.aime-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.aime-choice:hover,
+.aime-choice[aria-pressed='true'] {
+  background: var(--surface-2);
+}
+
+.aime-choice strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.aime-choice small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.aime-swatch {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+  position: relative;
+  overflow: hidden;
+}
+
+.aime-swatch::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--iris);
+}
+
+/* ─── Boîtes de dialogue, messages, bannière ───────────────────────────── */
+
+.aime-dialog {
+  width: min(460px, calc(100vw - 32px));
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.aime-dialog::backdrop {
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.aime-dialog h2 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 24px;
+}
+
+.aime-dialog p {
+  margin: 0 0 10px;
+  color: color-mix(in srgb, var(--ink) 85%, transparent);
+}
+
+.aime-dialog--welcome {
+  text-align: center;
+}
+
+.aime-dialog__note {
+  font-size: 12.5px;
+  color: var(--muted) !important;
+}
+
+.aime-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.aime-dialog--welcome .aime-dialog__actions {
+  justify-content: center;
+}
+
+.aime-dialog--list .aime-dialog__actions {
+  display: grid;
+  justify-content: stretch;
+}
+
+.aime-dialog--list .aime-dialog__actions .aime-button:not(.is-primary) {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.aime-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 14px/1.2 var(--font-text);
+  cursor: pointer;
+}
+
+.aime-button:hover {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+}
+
+.aime-button.is-primary {
+  border-color: transparent;
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.aime-toast {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  z-index: 90;
+  max-width: min(520px, calc(100vw - 24px));
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: var(--shadow);
+  font-size: 13.5px;
+  line-height: 1.4;
+  translate: -50% -150%;
+  transition: translate 220ms ease;
+}
+
+.aime-toast.is-visible {
+  translate: -50% 0;
+}
+
+.aime-toast[data-tone='error'] {
+  background: var(--danger);
+  color: #fff;
+}
+
+.aime-banner {
+  position: fixed;
+  top: 66px;
+  left: 50%;
+  z-index: 80;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(640px, calc(100vw - 24px));
+  padding: 12px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  translate: -50% 0;
+}
+
+.aime-banner p {
+  flex: 1 1 260px;
+  margin: 0;
+  font-size: 13.5px;
+}
+
+/* La page vide a sa propre consigne ; celle du conteneur ne s'affiche que pour les grilles imbriquées. */
+.aime-cell--root > .b-container > .b-container__hint {
+  display: none;
+}
+
+/* ─── Sélection, poignées, repères (repris d'AIMENEW) ───────────────────── */
+
+.is-edit .aime-cell:not(.aime-cell--root):hover {
+  outline: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: 5px;
+  border-radius: 4px;
+}
+
+.is-edit .aime-cell:not(.aime-cell--root):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 5px;
+}
+
+.is-edit .aime-cell.is-selected:not(.aime-cell--root) {
+  outline: 1.5px solid var(--accent);
+  outline-offset: 5px;
+  border-radius: 4px;
+  z-index: 10;
+}
+
+.is-edit .aime-cell.is-dragging {
+  opacity: 0.88;
+  z-index: 30;
+}
+
+.aime-stage[data-tool='move'] .is-edit .aime-cell:not(.aime-cell--root) {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.aime-stage[data-tool='move'] .is-edit [contenteditable] {
+  pointer-events: none;
+}
+
+.is-edit .b-text:focus {
+  caret-color: var(--accent);
+}
+
+.is-edit .aime-grid:not(:has(> .aime-cell)) {
+  min-height: calc(var(--row-h, 56px) * 3);
+}
+
+.is-edit .aime-cell--root > .b-container > .aime-grid:not(:has(> .aime-cell))::after {
+  content: 'Grille vide — ajoutez un texte, une image ou une grille avec la barre du bas';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 1rem;
+}
+
+.aime-handle {
+  position: absolute;
+  z-index: 15;
+  display: none;
+  padding: 0;
+  border: 0;
+  touch-action: none;
+}
+
+.aime-cell.is-selected > .aime-handle {
+  display: block;
+}
+
+.aime-handle--move {
+  top: -17px;
+  left: -17px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--iris);
+  box-shadow: 0 0 0 3px var(--bg), var(--shadow);
+  cursor: grab;
+}
+
+.aime-handle--move::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: var(--bg);
+  opacity: 0.7;
+}
+
+.aime-handle--resize {
+  right: -11px;
+  bottom: -11px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--bg);
+  cursor: nwse-resize;
+}
+
+/* Zone tactile plus large que le visuel. */
+.aime-handle::before {
+  content: '';
+  position: absolute;
+  inset: -11px;
+}
+
+.aime-guides {
+  position: absolute;
+  inset: 0;
+  display: none;
+  grid-template-columns: repeat(var(--cols, 12), minmax(0, 1fr));
+  gap: var(--gap, 16px);
+  pointer-events: none;
+}
+
+.aime-guides span {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.aime-grid.is-guiding > .aime-guides,
+.aime-cell.is-selected > .b-container > .aime-grid > .aime-guides {
+  display: grid;
+}
+
+/* ─── Petits écrans : la page d'abord ──────────────────────────────────── */
+
+@media (max-width: 760px) {
+  .aime-tool__label,
+  .aime-brand {
+    display: none;
+  }
+  .aime-tool {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    place-items: center;
+  }
+  /* Toute la barre reste visible : elle passe sur deux rangées plutôt que de défiler. */
+  .aime-dock {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 2px;
+    border-radius: 18px;
+  }
+  .aime-dock__group + .aime-dock__group {
+    padding-left: 0;
+    margin-left: 0;
+    border-left: 0;
+  }
+  .aime-dock__group {
+    padding: 0 3px;
+  }
+  .aime-status {
+    max-width: 34vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .aime-title {
+    width: 13ch;
+  }
+  .aime-stage {
+    padding-bottom: calc(240px + env(safe-area-inset-bottom));
+  }
+}
