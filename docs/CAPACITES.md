@@ -13,10 +13,6 @@ Chaque phase est indépendante, livrée par une PR, et ne dépend que de capacit
 | **7 — Orbe et interactions** | Ancrages, guidage, animations, suggestions, comportements réglables, contrôle d'accessibilité | AIME-COMPOSER `loop/src/governance.mjs`, `noema.mjs` ; Aime-Edition `base44/agents/aime_orchestrator.jsonc` (règles de gouvernance) | Phases 2, 4 |
 | **8 — Moteurs et métiers** | Broderie, mariage, musique, documents, timeline, Infinity, Cube — chacun via un **adaptateur testé** vers le document ou le projet | AIME-COMPOSER `loop/src/timeline.mjs` ; dépôt AIME STITCH, CANVAS `utils/dmcPalette.ts` ; Aime-Edition `components/aime/causal/*` ; AIME-NEXT blocs date/lieu/personnes | Phases 2, 4 selon le moteur |
 
-## Apport d'AIME STUDIO
-
-L'audit du Studio (aime-studio-mu.vercel.app) et le plan de reprise de ses idées — bibliothèque de 40 sections structurées, cartes, pipeline de réglages, progression nourrie par Point Zéro, audit EAA d'une URL, publication +nom — sont dans [AUDIT-AIME-STUDIO.md](AUDIT-AIME-STUDIO.md).
-
 ## Publication d'une réalisation à une URL publique
 
 Prévue entre les Phases 4 et 6 : voir [PUBLICATION.md](PUBLICATION.md). Elle demande une identité vérifiée côté serveur, donc la Phase 4.
